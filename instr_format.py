@@ -20,13 +20,6 @@ instr_field = BitField(27,31)
 # You need bitfields for the remaining fields of a
 # DM2018W instruction word
 
-# cond_field = BitField(24,26)
-# reg_target_field = BitField(20,23)
-# reg_src1_field = BitField(16,19)
-# reg_src2_field = BitField(12,15)
-# offset_field = BitField(0,11)
-
-
 class OpCode(Enum):
     """The operation codes specify what the CPU should do"""
     HALT = 0  # So we'll stop if we hit a zero in memory
