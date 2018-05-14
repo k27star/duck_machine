@@ -1,13 +1,12 @@
 """
-Duck Machine model DM2018W CPU
+Duck Machine model DM2018S CPU
 """
 
-from instr_format import Instruction, OpCode, CondFlag
+from instr_format import Instruction, OpCode, CondFlag, decode
 from memory import Memory
-from alu import ALU
 from register import Register, ZeroRegister
+from alu import ALU
 from mvc import MVCEvent, MVCListenable
-
 
 from typing import List, Tuple
 
@@ -15,7 +14,6 @@ import logging
 logging.basicConfig()
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
-
 
 class CPUStep(MVCEvent):
     """CPU is beginning step with PC at a given address"""
@@ -26,14 +24,15 @@ class CPUStep(MVCEvent):
         self.instr_word = instr_word
         self.instr = instr
 
-class CPU(MVCListenable):
-    """Duck Machine central processing unit (CPU)
-    has 16 registers (including r0 that always holds zero
-    and r15 that holds the program counter), a few
-    flag registers (condition codes, halted state),
-    and some logic for sequencing execution.  The CPU
-    does not contain the main memory but has a bus connecting
-    it to a separate memory.
-    """
-    # See project web page for specs and suggestions
-    
+# Create a class CPU, subclassing MVCListenable.
+# It should have 16 registers (a list of Register objects),
+# and the first of them should be the special ZeroRegister
+# object that is always zero regardless of what is stored.
+# It should have a CondFlag with the current condition.
+# It should have a boolean "Halted" flag, and execution of
+# the "run" method should halt with the Halted flag is True
+# (set by the HALT instruction). The CPU does not contain
+# the memory, but has a connection to a Memory object
+# (specifically a MemoryMappedIO object).
+# See the project web page for more guidance. 
+
