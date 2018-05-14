@@ -1,8 +1,9 @@
 """
-Encoding and decoding the instruction format of 
-our simulated computer. 
+Instruction format for the Duck Machine 2018S (DM2018S),
+a simulated computer modeled loosely on the ARM processor
+found in many cell phones and the Raspberry Pi.
 
-Instruction words are modeled as an unsigned 32-bit integer
+Instruction words are unsigned 32-bit integers
 with the following fields (from high-order to low-order bits).  
 All are unsigned except offset, which is a signed value in 
 range -2^11 to 2^11 - 1. 
@@ -11,27 +12,36 @@ See docs/duck_machine.md for details.
 """
 
 from bitfield import BitField
-from enum import Enum, Flag, IntEnum
-import typing
+from enum import Enum, Flag
 
 # The field bit positions
-instr_field = BitField(27,31)
-# FIXME
-# You need bitfields for the remaining fields of a
-# DM2018W instruction word
+reserved = BitField(31,31)
+instr_field = BitField(26, 30)
+cond_field = BitField(22, 25)
+reg_target_field = BitField(18, 21)
+reg_src1_field = BitField(14, 17)
+reg_src2_field = BitField(10, 13)
+offset_field = BitField(0, 9)
+
+
+# The following operation codes control both the ALU and some
+# other parts of the CPU.  Only the ALU is modeled in the
+# bitfields project.  The CPU is introduced the following
+# week.
+# ADD, SUB, MUL, DIV, SHL, SHR are ALU-only operations
+# HALT, LOAD, STORE involve other parts of the CPU
 
 class OpCode(Enum):
-    """The operation codes specify what the CPU should do"""
-    HALT = 0  # So we'll stop if we hit a zero in memory
-    LOAD = 1
-    STORE = 2
-    ADD = 3
-    SUB = 5
-    MUL = 6
-    DIV = 7
-    SHL = 8  # Shift left
-    SHR = 9  # Shift right
-
+    """The operation codes specify what the CPU and ALU should do."""
+    # CPU control (beyond ALU)
+    HALT = 0    # Stop the computer simulation (in Duck Machine project)
+    LOAD = 1    # Transfer from memory to register
+    STORE = 2   # Transfer from register to memory
+    # ALU operations
+    ADD = 3     # Addition
+    SUB = 5     # Subtraction
+    MUL = 6     # Multiplication
+    DIV = 7     # Integer division (like // in Python)
 
 
 class CondFlag(Flag):
@@ -39,67 +49,58 @@ class CondFlag(Flag):
     of the condition code register are the same, so we can 
     logically and them to predicate an instruction. 
     """
-    N = 1
-    Z = 2
-    P = 4
-    ALWAYS = N | Z | P
+    M = 1  # Minus (negative)
+    Z = 2  # Zero
+    P = 4  # Positive
+    V = 8  # Overflow (arithmetic error, e.g., divide by zero)
+    NEVER = 0
+    ALWAYS = M | Z | P | V
 
     def __str__(self):
         """
-        If the exact combination has a name, we return that. 
-        Otherwise, we combine bits, e.g., ZP for non-negative. 
+        If the exact combination has a name, we return that.
+        Otherwise, we combine bits, e.g., ZP for non-negative.
         """
         for i in CondFlag:
             if i is self:
                 return i.name
         # No exact alias; give name as sequence of bit names
-        bits = [ ]
+        bits = []
         for i in CondFlag:
             masked = self & i
             if masked is i:
                 bits.append(i.name)
         return "".join(bits)
-    
-class RegIndex(IntEnum):
-    """Named r0..r15; some are special"""
-    r0 = 0   # r0 always holds zero; never changes
-    r1 = 1
-    r2 = 2
-    r3 = 3
-    r4 = 4
-    r5 = 5
-    r6 = 6
-    r7 = 7
-    r8 = 8
-    r9 = 9
-    r10 = 10
-    r11 = 11
-    r12 = 12
-    r13 = 13   
-    r14 = 14
-    r15 = 15  # r15 is the program counter register
 
-    def __str__(self):
-        return self.name
-    
 
+# Registers are numbered from 0 to 15, and have names
+# like r3, r15, etc.  Two special registers have additional
+# names:  r0 is called 'zero' because on the DM2018S it always
+# holds value 0, and r15 is called 'pc' because it is used to
+# hold the program counter.
+#
+NAMED_REGS = {
+    "r0": 0, "zero": 0,
+    "r1": 1, "r2": 2, "r3": 3, "r4": 4, "r5": 5, "r6": 6, "r7": 7, "r8": 8,
+    "r9": 9, "r10": 10, "r11": 11, "r12": 12, "r13": 13, "r14": 14,
+    "r15": 15, "pc": 15
+    }
+
+# A complete DM2018S instruction word, in its decoded form.  In DM2018S
+# memory an instruction is just an int.  Before executing an instruction,
+# we decoded it into an Instruction object so that we can more easily
+# interpret its fields.
+#
 class Instruction(object):
-    """This class is for a decoded instruction, with fields 
-    for each part of the instruction.  That is not the same 
-    as the instruction *word* in memory.  We decode an
-    instruction word (by extracting bit fields) to form an 
-    Instruction object. 
+    """An instruction is made up of several fields, which 
+    are represented here as object fields.
     """
 
-    # This constructor is typically called by one of the
-    # 'factory methods' below.  During the fetch/decode/execute
-    # cycle, the constructor is called by the decode method. 
-    # 
     def __init__(self, op: OpCode, cond: CondFlag,
-                     reg_target: RegIndex, reg_src1: RegIndex,
-                     reg_src2: RegIndex,
+                     reg_target: int, reg_src1: int,
+                     reg_src2: int,
                      offset: int):
-        """Assemble an instruction from its fields."""
+        """Assemble an instruction from its fields. """
         self.op = op
         self.cond = cond
         self.reg_target = reg_target
@@ -108,63 +109,25 @@ class Instruction(object):
         self.offset = offset
         return
 
-    # This factory method is handy for testing and debugging.
-    #
-    @classmethod
-    def make(cls, opcode: str, predicate: str,
-                     target: str, src1: str, src2: str,
-                     offset: int) -> "Instruction":
-        """Construct instruction from mnemonic names"""
-        return cls(OpCode[opcode], CondFlag[predicate], RegIndex[target],
-                       RegIndex[src1], RegIndex[src2], offset)
+    def __eq__(self, other):
+        """Each field the same"""
+        return (self.op == other.op and
+                self.cond == other.cond and
+                self.reg_target == other.reg_target and
+                self.reg_src1 == other.reg_src1 and
+                self.reg_src2 == other.reg_src2 and
+                self.offset == other.offset)
 
-
-    #  'encode' is the inverse of 'decode' --- it converts from a
-    #   an Instruction object to an int representing an instruction word.
-    #   It is used by the assembler to convert assembly language to
-    #   object code. 
     def encode(self) -> int:
         """Encode instruction as 32-bit integer"""
         word = 0
         word = instr_field.insert(self.op.value, word)
         word = cond_field.insert(self.cond.value, word)
-        word = reg_target_field.insert(self.reg_target.value, word)
-        word = reg_src1_field.insert(self.reg_src1.value, word)
-        word = reg_src2_field.insert(self.reg_src2.value, word)
+        word = reg_target_field.insert(self.reg_target, word)
+        word = reg_src1_field.insert(self.reg_src1, word)
+        word = reg_src2_field.insert(self.reg_src2, word)
         word = offset_field.insert(self.offset, word)
         return word
-
-    # 'decode' is used in the fetch/decode/execute cycle of the
-    # CPU.  Extract each of the fields from the instruction word
-    # and then use them to create an Instruction object.
-    #
-    @classmethod
-    def decode(cls, word: int) -> "Instruction": 
-        """Decode a memory word (32 bit int) into a new Instruction"""
-        # FIXME - this stub just creates a HALT instruction.
-        # Use your bitfield project to extract correct fields. 
-        op = OpCode.HALT.value
-        cond = CondFlag.ALWAYS.value
-        reg_target = RegIndex.r0.value
-        reg_src1 = RegIndex.r0.value
-        reg_src2 = RegIndex.r0.value
-        offset = 0
-        # Here's where we call the real constructor to combine
-        # these values into an Instruction object
-        return cls(OpCode(op), CondFlag(cond),
-                       RegIndex(reg_target),
-                       RegIndex(reg_src1), RegIndex(reg_src2),
-                       offset)
-
-    # The assembler uses the from_dict method to construct an
-    # instruction after parsing a line of assembly code
-    # 
-    @classmethod
-    def from_dict(cls, d) -> "Instruction":
-        """Create an instruction from a dict containing fields."""
-        return cls.make(d["opcode"], d["predicate"],
-                            d["target"], d["src1"], d["src2"],
-                            int(d["offset"]))
 
 
     def __str__(self):
@@ -174,9 +137,53 @@ class Instruction(object):
         else:
             cond_codes = "/{}".format(self.cond)
         
-        return "{}{:4}  {},{},{}[{}]".format(
+        return "{}{:4}  r{},r{},r{}[{}]".format(
             self.op.name,  cond_codes,
-            self.reg_target.name, self.reg_src1.name, 
-            self.reg_src2.name, self.offset)
+            self.reg_target, self.reg_src1,
+            self.reg_src2, self.offset)
 
-        
+
+# More convenient functions for creating Instruction objects
+
+#  Interpret an integer (memory word) as an instruction.
+#  This is the decode part of the fetch/decode/execute cycle of the CPU.
+#
+def decode(word: int) -> Instruction:
+        """Decode a memory word (32 bit int) into a new Instruction"""
+        op = instr_field.extract(word)
+        cond = cond_field.extract(word)
+        reg_target = reg_target_field.extract(word)
+        reg_src1 = reg_src1_field.extract(word)
+        reg_src2 = reg_src2_field.extract(word)
+        offset = offset_field.extract_signed(word)
+        return Instruction(OpCode(op), CondFlag(cond),
+                       reg_target, reg_src1, reg_src2, offset)
+
+
+# When we build an assembler, we'll use regular expressions for pattern matching,
+# and we'll get a dict of the matched fields.  It will be handy to have a function
+# for constructing an instruction from the dict.
+#
+def instruction_from_dict(d: dict) -> Instruction:
+        """Construct an Instruction from a dict containing symbolic fields. """
+        return Instruction(OpCode[d["opcode"]],
+                            CondFlag[d["predicate"]],
+                            NAMED_REGS[d["target"]],
+                            NAMED_REGS[d["src1"]],
+                            NAMED_REGS[d["src2"]],
+                            int(d["offset"]))
+
+# Until we build an assembler, we can construct instructions from
+# a very simple string format like
+#   "ADD Z r1 r2 r3 -14"
+#
+def instruction_from_string(s) -> Instruction:
+    """Construct an Instruction from a string.
+    Example:  instruction_from_string("ADD Z r1 r2 r3 -14")
+    to construct Instruction(OpCode("ADD"), CondFlag("Z"), 1, 2, 3, 14)).
+    """
+    fields = s.split()
+    opcode, predicate, targ_name, src1_name, src2_name, offset = fields
+    return Instruction(OpCode[opcode], CondFlag[predicate],
+                       NAMED_REGS[targ_name], NAMED_REGS[src1_name], NAMED_REGS[src2_name], int(offset))
+

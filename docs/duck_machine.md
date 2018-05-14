@@ -1,6 +1,6 @@
 # The Duck Machine
 
-The Duck Machine model 2018W (DM2018W) is a virtual computer architecture.  It is much simpler than most current CPU  architectures, but introduces some basic concepts of computer architecture: 
+The Duck Machine model 2018S (DM2018S) is a virtual computer architecture.  It is much simpler than most current CPU  architectures, but introduces some basic concepts of computer architecture: 
 
 * A central processing unit (CPU) with a limited number of high-speed registers, separate from a random-access memory (RAM) with much higher capacity.
 * General purpose registers and a small number of registers dedicated to special purposes, including a program counter. 
@@ -15,13 +15,13 @@ Our Duck Machine simulation lacks several features of a more complete or realist
 * The Duck Machine does not support virtual memory. All memory addresses are indexes of the (simulated) physical RAM.  You will learn about mapping virtual memory addresses to physical memory addresses in CIS 415. 
 * The Duck Machine does not support asynchronous execution or interrupts.  It lacks any protection mechanisms (there is no "supervisor mode").  You will learn more about these in CIS 415. 
 
-Duck Machine projects were introduced many years ago in the 21x series by Amr Sabry, now at Indiana University.  Arthur Farley extended and refined them for a series of CIS 212 projects which included a simple assembler and compiler.  Model 2018W is thus a revival of sorts. 
+Duck Machine projects were introduced many years ago in the 21x series by Amr Sabry, now at Indiana University.  Arthur Farley extended and refined them for a series of CIS 212 projects which included a simple assembler and compiler.  Those projects were implemented in Java; ours is implemented in Python, and varies considerably from the original, but can be considered a revival of sorts. 
 
 ### Based on a true story
 
-The DM2018W is based on the ARM (Advanced Risc Machines) instruction set architecture to approximately the same extent that The Hobbit is based on The Odyssey (with elements drawn also from Beowulf).  The ARM processor is found in many small devices including phones and the Raspberry Pi computer. 
+The DM2018S is based on the ARM (Advanced Risc Machines) instruction set architecture to approximately the same extent that The Hobbit is based on The Odyssey (with elements drawn also from Beowulf).  The ARM processor is found in many small devices including phones and the Raspberry Pi computer. 
 
-Notable features of the ARM instruction set architecture that have been adopted by the DM2018W include: 
+Notable features of the ARM instruction set architecture that have been adopted by the DM2018S include: 
 
 * A simple load/store architecture (like many reduced instruction set computers). 
 * Uniform treatment of the program counter (PC) as any other general purpose register. 
@@ -31,18 +31,17 @@ Together these allow a very compact instruction set.  For example, a conditional
 
 ## Register Set
 
-The DM2018W has 16 registers, 0..15.  The following registers have special uses (but are still addressable as general purpose registers): 
+The DM2018S has 16 registers, 0..15.  The following registers have special uses (but are still addressable as general purpose registers): 
 
 * R15 is also referred to as PC, the Program Counter
-* R14 is also referred to as LR, the Link Register or Return Address Register. (We are not currently using the return address register.) 
-* R13 is also referred to as the stack pointer. (We are not using it as a stack pointer yet.) 
 * R0 always holds zero.  Moving or loading another value into R0 does not change the value of R0.  R0 is useful in memory addressing and as a target when we wish to set a condition code without saving a value. 
 
-In addition to the general purpose registers, there are three special purpose flag registers, called the condition codes: 
+In addition to the general purpose registers, there are four special purpose flag registers, called the condition codes: 
 
-* The N flag indicates the prior instruction produced a negative result
+* The M (minus) flag indicates the prior instruction produced a negative result
 * The Z flag indicates the prior instruction produced a result of zero
 * The P flag indicates the prior instruction produced a positive result
+* The V (overflow) flag indicates the prior instruction encountered an error, such as dividing by zero.  
 
 Note that every result produced by an arithmetic instruction must set exactly one of the condition codes.  
 
@@ -52,12 +51,13 @@ All random access memory is organized as 32-bit words. Each instruction word is 
 
 The bit fields are: 
 
-* 27..31 (5 bits) operation code (e.g., add, store, etc)
-* 24..26 (3 bits) conditional execution masks (mN,mZ,mP).  Conceptually, we treat each bit as a boolean variable, True for 1 and False for 0.  We combine them with the condition code registers N, Z, P,  and execute the instruction only if ((mN and N) or (mZ and Z) or (mP or P)).  Note that if all three mask bits are 1, the instruction will always be executed, and an instruction with all three mask bits 0 will never be executed.  
+* 31 (1 bit) reserved for future use
+* 26 .. 30 (5 bits) operation code (e.g., add, store, etc)
+* 22..25 (4 bits) conditional execution masks (mN,mZ,mP,mV).  Conceptually, we treat each bit as a boolean variable, True for 1 and False for 0.  We combine them with the condition code registers M, Z, P, and V and execute the instruction only if ((mM and M) or (mZ and Z) or (mP or P) or (mV or V)).  Note that if all four mask bits are 1, the instruction will always be executed, and an instruction with all  mask bits 0 will never be executed.  
 * 20..23 (4 bits) index of target register (where the result of an operation should be stored).  Note that if the target register is r0 (ZERO), the result is effectively discarded, but the condition codes are still set.  Also, if the target register is r15, also known as PC, the instruction is effectively a control flow jump. 
-* 16..19 (4 bits) index of first source register
-* 12..15 (4 bits) index of the second source register
-* 0..11 (12 bits) a displacement, interpreted as a *signed* 12 bit twos-complement integer ranging from -2048 (-2^11) to 2047 (2^11 - 1).  
+* 18..21 (4 bits) index of first source register
+* 14..17 (4 bits) index of the second source register
+* 0..9 (10 bits) a displacement, interpreted as a *signed* 10 bit twos-complement integer ranging from -512 (-2^9) to 511 (2^9 - 1).  
 
 Most operations combine the first source register with the sum of the second source register and the displacement, placing the result in the target register. 
 
