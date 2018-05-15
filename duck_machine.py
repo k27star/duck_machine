@@ -11,12 +11,10 @@ from cpu import CPU
 import view
 
 import argparse
-import sys
 import io
 
-from typing import List, Tuple
-
 import logging
+
 logging.basicConfig()
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -26,13 +24,14 @@ def cli() -> object:
     """Get arguments from command line"""
     parser = argparse.ArgumentParser(description="Duck Machine Simulator")
     parser.add_argument("objfile", type=argparse.FileType('r'),
-                            help="Object file input")
+                        help="Object file input")
     parser.add_argument("-d", "--display", help="Graphical display",
                         action="store_true")
     parser.add_argument("-s", "--step", help="Single step mode",
                         action="store_true")
     args = parser.parse_args()
     return args
+
 
 def load(file: io.IOBase, memory: Memory) -> None:
     addr = 0
@@ -41,11 +40,14 @@ def load(file: io.IOBase, memory: Memory) -> None:
         memory.put(addr, word)
         addr += 1
 
+
 def duck_out(addr: int, value: int) -> None:
     print("Quack!: {}".format(value))
 
+
 def duck_in(addr: int) -> int:
     return int(input("Quack! Gimme an int! "))
+
 
 def main():
     """" Run a Duck Machine program from
@@ -59,16 +61,16 @@ def main():
     # For that, maximum positive value is 511.  We'll
     # reserve addresses 510 and 511 for input and output
     # respectively.
-    mem.map_address_in(510,duck_in)
-    mem.map_address_out(511,duck_out)
+    mem.map_address_in(510, duck_in)
+    mem.map_address_out(511, duck_out)
     cpu = CPU(mem)
-    if args.display: 
-       display = view.MachineStateView(cpu,1500,1000)
+    if args.display:
+        display = view.MachineStateView(cpu, 1500, 1000)
     load(args.objfile, mem)
     cpu.run(single_step=args.step)
     print("Halted")
     if args.display:
-      input("Press enter to end")
+        input("Press enter to end")
 
 
 if __name__ == "__main__":
