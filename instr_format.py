@@ -15,7 +15,7 @@ from bitfield import BitField
 from enum import Enum, Flag
 
 # The field bit positions
-reserved = BitField(31,31)
+reserved = BitField(31, 31)
 instr_field = BitField(26, 30)
 cond_field = BitField(22, 25)
 reg_target_field = BitField(18, 21)
@@ -34,14 +34,14 @@ offset_field = BitField(0, 9)
 class OpCode(Enum):
     """The operation codes specify what the CPU and ALU should do."""
     # CPU control (beyond ALU)
-    HALT = 0    # Stop the computer simulation (in Duck Machine project)
-    LOAD = 1    # Transfer from memory to register
-    STORE = 2   # Transfer from register to memory
+    HALT = 0  # Stop the computer simulation (in Duck Machine project)
+    LOAD = 1  # Transfer from memory to register
+    STORE = 2  # Transfer from register to memory
     # ALU operations
-    ADD = 3     # Addition
-    SUB = 5     # Subtraction
-    MUL = 6     # Multiplication
-    DIV = 7     # Integer division (like // in Python)
+    ADD = 3  # Addition
+    SUB = 5  # Subtraction
+    MUL = 6  # Multiplication
+    DIV = 7  # Integer division (like // in Python)
 
 
 class CondFlag(Flag):
@@ -84,7 +84,8 @@ NAMED_REGS = {
     "r1": 1, "r2": 2, "r3": 3, "r4": 4, "r5": 5, "r6": 6, "r7": 7, "r8": 8,
     "r9": 9, "r10": 10, "r11": 11, "r12": 12, "r13": 13, "r14": 14,
     "r15": 15, "pc": 15
-    }
+}
+
 
 # A complete DM2018S instruction word, in its decoded form.  In DM2018S
 # memory an instruction is just an int.  Before executing an instruction,
@@ -97,9 +98,9 @@ class Instruction(object):
     """
 
     def __init__(self, op: OpCode, cond: CondFlag,
-                     reg_target: int, reg_src1: int,
-                     reg_src2: int,
-                     offset: int):
+                 reg_target: int, reg_src1: int,
+                 reg_src2: int,
+                 offset: int):
         """Assemble an instruction from its fields. """
         self.op = op
         self.cond = cond
@@ -129,16 +130,15 @@ class Instruction(object):
         word = offset_field.insert(self.offset, word)
         return word
 
-
     def __str__(self):
         """String representation looks something like assembly code"""
         if self.cond is CondFlag.ALWAYS:
             cond_codes = ""
         else:
             cond_codes = "/{}".format(self.cond)
-        
+
         return "{}{:4}  r{},r{},r{}[{}]".format(
-            self.op.name,  cond_codes,
+            self.op.name, cond_codes,
             self.reg_target, self.reg_src1,
             self.reg_src2, self.offset)
 
@@ -149,14 +149,14 @@ class Instruction(object):
 #  This is the decode part of the fetch/decode/execute cycle of the CPU.
 #
 def decode(word: int) -> Instruction:
-        """Decode a memory word (32 bit int) into a new Instruction"""
-        op = instr_field.extract(word)
-        cond = cond_field.extract(word)
-        reg_target = reg_target_field.extract(word)
-        reg_src1 = reg_src1_field.extract(word)
-        reg_src2 = reg_src2_field.extract(word)
-        offset = offset_field.extract_signed(word)
-        return Instruction(OpCode(op), CondFlag(cond),
+    """Decode a memory word (32 bit int) into a new Instruction"""
+    op = instr_field.extract(word)
+    cond = cond_field.extract(word)
+    reg_target = reg_target_field.extract(word)
+    reg_src1 = reg_src1_field.extract(word)
+    reg_src2 = reg_src2_field.extract(word)
+    offset = offset_field.extract_signed(word)
+    return Instruction(OpCode(op), CondFlag(cond),
                        reg_target, reg_src1, reg_src2, offset)
 
 
@@ -165,13 +165,14 @@ def decode(word: int) -> Instruction:
 # for constructing an instruction from the dict.
 #
 def instruction_from_dict(d: dict) -> Instruction:
-        """Construct an Instruction from a dict containing symbolic fields. """
-        return Instruction(OpCode[d["opcode"]],
-                            CondFlag[d["predicate"]],
-                            NAMED_REGS[d["target"]],
-                            NAMED_REGS[d["src1"]],
-                            NAMED_REGS[d["src2"]],
-                            int(d["offset"]))
+    """Construct an Instruction from a dict containing symbolic fields. """
+    return Instruction(OpCode[d["opcode"]],
+                       CondFlag[d["predicate"]],
+                       NAMED_REGS[d["target"]],
+                       NAMED_REGS[d["src1"]],
+                       NAMED_REGS[d["src2"]],
+                       int(d["offset"]))
+
 
 # Until we build an assembler, we can construct instructions from
 # a very simple string format like
@@ -186,4 +187,3 @@ def instruction_from_string(s) -> Instruction:
     opcode, predicate, targ_name, src1_name, src2_name, offset = fields
     return Instruction(OpCode[opcode], CondFlag[predicate],
                        NAMED_REGS[targ_name], NAMED_REGS[src1_name], NAMED_REGS[src2_name], int(offset))
-
